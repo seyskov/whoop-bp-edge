@@ -26,7 +26,8 @@ def main():
     subprocess.run(["git", "diff", "--exit-code", "HEAD", "--", "research/java"], check=True, cwd=PROTOCOL, stdout=subprocess.DEVNULL)
     tools = SDK / "build-tools" / "36.0.0"
     android = SDK / "platforms" / "android-37.0" / "android.jar"
-    sources = [PROTOCOL / "research/java/org/whoopbp/probe/Gen5Probe.java", ROOT / "src/org/whoopbp/probe/ProbeActivity.java"]
+    sources = [p for p in sorted((PROTOCOL / "research/java/org/whoopbp/probe").glob("*.java")) if not p.name.endswith("Test.java")]
+    sources.append(ROOT / "src/org/whoopbp/probe/ProbeActivity.java")
     for p in [*sources, android, JDK / "bin/javac", tools / "aapt2"]:
         if not p.exists():
             raise SystemExit(f"Missing build input: {p}")

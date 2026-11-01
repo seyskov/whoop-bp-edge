@@ -18,7 +18,8 @@ BUTTONS = {
     "connect": "ПОДКЛЮЧИТЬ WHOOP · 1",
     "survey": "2. ПРОЧИТАТЬ СВЕДЕНИЯ И ФЛАГИ",
     "raw": "3. LIVE RAW · 45 СЕКУНД",
-    "history": "4. ПЕРВЫЙ БЛОК ИСТОРИИ · БЕЗ ACK",
+    "history": "4. ФОРМА R26 · 2 МИНУТЫ",
+    "archive": "СОХРАНИТЬ ОКНА ЛОКАЛЬНО",
     "stop": "ОСТАНОВИТЬ / ОТКЛЮЧИТЬСЯ",
 }
 
@@ -46,7 +47,7 @@ def tap(key):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=[*BUTTONS, "status", "save", "wait"])
+    parser.add_argument("action", choices=[*BUTTONS, "status", "save", "wave", "wait"])
     parser.add_argument("--seconds", type=int, default=5)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -54,12 +55,19 @@ def main():
         tap(args.action)
     elif args.action == "status":
         print(json.dumps(status(), indent=2, ensure_ascii=False))
-    elif args.action == "save":
+    elif args.action in ("save", "wave"):
         if not args.output:
             parser.error("save needs --output")
+        report=status()
+        if args.action == "wave":
+            local=json.loads(adb("exec-out", "run-as", PACKAGE, "cat", "files/historical-windows.json"))
+            if local.get("capture_id") != report.get("capture_id") or not local.get("windows"):
+                raise SystemExit("No saved waveform for this session; stale data rejected.")
+        else:
+            local=report
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps(status(), indent=2, ensure_ascii=False)+"\n")
-        print(f"Saved diagnostic summary: {args.output}")
+        args.output.write_text(json.dumps(local, indent=2, ensure_ascii=False)+"\n")
+        print(f"Saved local {args.action}: {args.output}; windows={len(local.get('windows', []))}")
     elif args.action == "wait":
         if not 1 <= args.seconds <= 50:
             parser.error("wait must be 1..50 seconds")
@@ -67,7 +75,7 @@ def main():
         while time.monotonic() < end:
             time.sleep(min(5, end-time.monotonic()))
             s = status()
-            print(json.dumps({k:s.get(k) for k in ["phase", "error", "hello_succeeded", "firmware", "valid_frames", "historical_versions", "live_record_candidates_not_decoded", "raw_start_status", "raw_stop_status", "last_write_start_code"]}), flush=True)
+            print(json.dumps({k:s.get(k) for k in ["phase", "error", "hello_succeeded", "last_hello_worn", "last_hello_age_seconds", "valid_frames", "historical_versions", "historical_windows_saved"]}), flush=True)
 
 if __name__ == "__main__":
     main()
